@@ -20,19 +20,28 @@ resource "aws_vpc" "main_vpc" {
 }
 
 # Data sources são informações que o provider fornece para nós.
-data "aws_regions" "current" {
-  
+data "aws_regions" "currentregions" {}
+
+data "aws_caller_identity" "identity" {}
+
+# Outputs
+# Outputs são informações que queremos mostrar ao final da execução do comando terraform apply ou ao executar o comando terraform output
+# Uma convenção é criar um arquivo separado chamado "outputs.tf" para armazenar os outputs.
+output "regions" {
+  value = data.aws_regions.currentregions.names
 }
 
-# Outputs são informações que queremos mostrar ao final da execução do comando terraform apply ou ao executar o comando terraform output
+output "myidentity"{
+  value = data.aws_caller_identity.identity
+}
 
-output "regions" {
-  value = data.aws_regions.current.names
+output "vpc_main_route_table" {
+  value = aws_vpc.main_vpc.main_route_table_id
 }
 
 # Interpolação
 # Usamos interpolação para criar ligar recursos.
-# Neste exemplo abaixo, criamos uma instância dentro da vpc criada anteriormente
+# Neste exemplo abaixo, criamos um security group e interpolamos o nome dele para a criação de uma instância.
 
 resource "aws_security_group" "allow_ssh" {
   name = "allow_ssh"
@@ -55,8 +64,41 @@ resource "aws_security_group" "allow_ssh" {
 
 resource "aws_instance" "instancia" {
     ami = "ami-0742b4e673072066f"
-    instance_type = "t2.micro"
+    #ami = var.ami_id
+    instance_type = "t2.micro" 
     security_groups = [ aws_security_group.allow_ssh.name ]
-
 }
 
+resource "aws_s3_bucket" "bucket0" {
+  bucket = "${data.aws_caller_identity.identity.account_id}-bucket0"
+}
+
+# Dependências
+
+resource "aws_s3_bucket" "bucket1" {
+  tags = {
+    "dependencia" = aws_s3_bucket.bucket2.arn
+  }
+}
+
+resource "aws_s3_bucket" "bucket2" {
+}
+
+
+# Variáveis
+# Diferente de outras linguagens de programação, no HCL usamos variáveis para pegar inputs do usuário 
+# Uma convenção é criar um arquivo separado chamado "variable.tf" para armazenar as variáveis utilizadas.
+variable "ami_id"{
+  type = string
+}
+
+# Locals
+# locals são como alias. Usamos isso para não precisarmos repetir uma expressão que aparece bastante no nosso código.
+
+locals {
+  name = "aprendendohcl"
+}
+
+resource "aws_s3_bucket" "bucket3" {
+  bucket =  local.name
+}
