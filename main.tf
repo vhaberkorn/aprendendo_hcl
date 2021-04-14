@@ -105,7 +105,7 @@ resource "aws_s3_bucket" "bucket3" {
 # Usamos o count para criar múltiplos recursos com a mesma definição
 
 resource "aws_instance" "webserver" {
-  count         = 3
+  count         = 0
   ami           = "ami-0742b4e673072066f"
   instance_type = "t2.micro"
 
@@ -133,3 +133,74 @@ resource "aws_instance" "dbserver" {
 
 # Provisioners
 # Utilizamos os provisioners para execução de comandos ou cópia de arquivo entre a máquina host (que roda código terraform) e target (infraestrutura que está sendo criada)
+
+
+resource "aws_instance" "provisioner_file" {
+  ami           = "ami-0742b4e673072066f"
+  instance_type = "t2.micro"
+  key_name = "minhachavepessoal"
+  security_groups = [aws_security_group.allow_ssh.name]
+
+  provisioner "file" {
+    source =   "files/arquivo.txt"
+    destination = "/tmp/arquivo.txt"
+    
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = file("~/.ssh/id_rsa")
+      host        = self.public_ip
+    }
+  }  
+  tags = {
+    "Name" = "File provisioner"
+  }
+}
+
+resource "aws_instance" "provisioner_remote" {
+  ami           = "ami-0742b4e673072066f"
+  instance_type = "t2.micro"
+  key_name = "minhachavepessoal"
+  security_groups = [
+    aws_security_group.allow_ssh.name, 
+    aws_security_group.allow_http.name
+    ]
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum install httpd -y",
+      "sudo systemctl enable httpd.service",
+      "sudo systemctl start httpd.service"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = file("~/.ssh/id_rsa")
+      host        = self.public_ip
+    }
+  }  
+  tags = {
+    "Name" = "Remote-exec"
+  }
+}
+
+resource "aws_security_group" "allow_http" {
+  name        = "allow_http"
+  description = "Allow http inbound"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
